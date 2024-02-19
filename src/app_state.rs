@@ -1,8 +1,9 @@
-use crate::{Music, Playlist};
+use crate::*;
 
 pub enum AppState {
     QUIT,
     HOME,
+    LOGIN,
     PLAYMUSIC(Music),
     PLAYPLAYLIST(Playlist),
 }

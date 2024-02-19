@@ -3,13 +3,13 @@ use std::io::BufReader;
 #[derive(Debug, Clone)]
 pub struct Music {
     pub id: i64,
-    name: String,
+    pub name: String,
     path: String,
-    duration: u64,
+    pub duration: i64,
 }
 
 impl Music {
-    pub fn new(id: i64, name: &str, filename: &str, duration: u64) -> Self {
+    pub fn new(id: i64, name: &str, filename: &str, duration: i64) -> Self {
         let path = String::from("musics/") + filename;
         Music {id: id, name: String::from(name), path: path, duration: duration}
     }
