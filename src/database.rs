@@ -105,4 +105,16 @@ impl Database {
         let query = format!("INSERT INTO music_playlist (music_id, playlist_id) VALUES ({}, {});", music_id, playlist_id).to_string();
         self.connection.execute(query);
     }
+    pub fn remove_music(&self, music_name: &str, user_id: i64) -> Result<(), (sqlite::Error)> {
+        todo!()
+    }
+    pub fn remove_playlist(&self, playlist_name: &str, user_id: i64) -> Result<(), (sqlite::Error)> {
+        todo!()
+    }
+    pub fn remove_user(&self, user_name: &str, user_id: i64) -> Result<(), (sqlite::Error)> {
+        todo!()
+    }
+    pub fn remove_music_playlist(&self, music_name: &str, playlist_name: &str, user_id: i64) -> Result<(), (sqlite::Error)> {
+        todo!()
+    }
 }
