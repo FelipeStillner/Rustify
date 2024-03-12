@@ -8,20 +8,20 @@ pub struct User {
 }
 
 impl User {
-    pub fn new(id: i64, name: &str) -> Self {
+    pub fn new(i: i64, n: &str) -> Self {
         User {
-            id: id,
-            name: name.to_string(),
+            id: i,
+            name: n.to_string(),
             playlists: vec![],
             musics: vec![],
         }
     }
-    pub fn add_playlist(&mut self, playlist: Playlist) {
-        self.playlists.push(playlist);
+    pub fn add_playlist(&mut self, p: Playlist) {
+        self.playlists.push(p);
     }
-    pub fn get_playlist(&mut self, playlist_name: &str) -> Option<&Playlist> {
+    pub fn get_playlist(&mut self, n: &str) -> Option<&Playlist> {
         self.playlists
             .iter()
-            .find(|&x| x.name.as_str() == playlist_name)
+            .find(|&x| x.name.as_str() == n)
     }
 }

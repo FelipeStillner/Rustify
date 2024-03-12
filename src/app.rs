@@ -1,5 +1,5 @@
 use crate::*;
-use std::io;
+use std::io::{self, BufRead, Read};
 
 pub struct App {
     state: AppState,
@@ -51,6 +51,7 @@ impl App {
                     }
                 }
                 AppState::PLAYMUSIC(music) => {
+                    println!("a");
                     music.play();
                     self.state = AppState::HOME;
                 }
@@ -65,13 +66,16 @@ impl App {
                     println!(">> QUIT");
                     break;
                 }
+                AppState::EDIT => {
+                    todo!()
+                }
             }
         }
     }
     fn run_home(&mut self) {
         println!(">> Home ({}) - input:", self.user.name);
         let mut input = String::new();
-        io::stdin().read_line(&mut input).unwrap();
+        io::stdin().lock().read_line(&mut input).unwrap();
         let input_list: Vec<&str> = input.trim().split(" ").collect();
         if input_list[0] == "quit" {
             self.state = AppState::QUIT;

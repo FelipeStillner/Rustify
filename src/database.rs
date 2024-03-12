@@ -56,11 +56,11 @@ impl Database {
             None
         }
     }
-    pub fn find_playlist(&self, name: &str, user_id: i64) -> Option<Playlist> {
+    pub fn find_playlist(&self, playlist_name: &str, user_id: i64) -> Option<Playlist> {
         let mut playlist: Playlist;
         let query = "SELECT * FROM playlists WHERE name = :name".to_string();
         let mut statement = self.connection.prepare(query).unwrap();
-        statement.bind((":name", name)).unwrap();
+        statement.bind((":name", playlist_name)).unwrap();
         if let Ok(sqlite::State::Row) = statement.next() {
             let id = statement.read::<i64, _>("id").unwrap();
             let name = statement.read::<String, _>("name").unwrap();
@@ -75,14 +75,14 @@ impl Database {
             None
         }
     }
-    pub fn load_playlist(&self, playlist: &mut Playlist) {
+    pub fn load_playlist(&self, p: &mut Playlist) {
         let query = "SELECT * FROM music_playlist WHERE playlist_id = :id".to_string();
         let mut statement = self.connection.prepare(query).unwrap();
-        statement.bind((":id", playlist.id)).unwrap();
+        statement.bind((":id", p.id)).unwrap();
 
         while let Ok(sqlite::State::Row) = statement.next() {
             let music_id = statement.read::<i64, _>("music_id").unwrap();
-            playlist.add_music(self.find_music_id(music_id).unwrap())
+            p.add_music(self.find_music_id(music_id).unwrap())
         }
     }
     pub fn add_music(&self, music: Music) -> Result<(), (sqlite::Error)> {
@@ -101,9 +101,9 @@ impl Database {
         let query = format!("INSERT INTO users (name) VALUES (\"{}\");", user.name).to_string();
         self.connection.execute(query)
     }
-    pub fn add_music_playlist(&self, music_id: i64, playlist_id: i64) {
+    pub fn add_music_playlist(&self, music_id: i64, playlist_id: i64) -> Result<(), (sqlite::Error)> {
         let query = format!("INSERT INTO music_playlist (music_id, playlist_id) VALUES ({}, {});", music_id, playlist_id).to_string();
-        self.connection.execute(query);
+        self.connection.execute(query)
     }
     pub fn remove_music(&self, music_name: &str, user_id: i64) -> Result<(), (sqlite::Error)> {
         todo!()
