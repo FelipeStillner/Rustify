@@ -6,7 +6,7 @@ use std::thread;
 
 use crate::*;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Playlist {
     pub id: i64,
     pub name: String,
@@ -40,15 +40,12 @@ impl Playlist {
 }
 
 impl Play for Playlist {
-    fn play(&self) {
-        let mut stdout = std::io::stdout();
-        self.reset_terminal(&mut stdout);
-
-        let (sender, receiver): (Sender<Input>, Receiver<Input>) = mpsc::channel();
-        let thread = thread::spawn(|| <Music as Play>::get_input(sender));
+    fn play(&self, receiver: &std::sync::mpsc::Receiver<String>, interface: &mut Interface) {
+        //let mut stdout = std::io::stdout();
+        //self.reset_terminal(&mut stdout);
 
         let (_stream, handle) = rodio::OutputStream::try_default().unwrap();
-        let sink = rodio::Sink::try_new(&handle).unwrap();
+        let sink: Sink = rodio::Sink::try_new(&handle).unwrap();
         for music in &self.musics {
             let path = String::from("musics/") + music.filename.as_str();
             let file = std::fs::File::open(path.to_string()).unwrap();
@@ -57,52 +54,50 @@ impl Play for Playlist {
 
         sink.play();
 
+        interface.music = self.name.to_string();
+        interface.music_duration = self.duration;
+
         let mut status = Status::new();
 
+        let mut instant = Instant::now();
         while !sink.empty() {
+            let dt: Duration = instant.elapsed();
+            instant = Instant::now();
+            status.update(dt, sink.is_paused());
+
+            interface.update();
+            interface.music_time = status.time;
+            interface.paused = status.paused;
+
             match receiver.try_recv() {
-                Ok(i) => match i {
-                    Input::PAUSEPLAY => {
-                        if sink.is_paused() {
-                            sink.play();
-                        } else {
-                            sink.pause();
+                Ok(input) => {
+                    interface.clear();
+                    let input = manipulate_play_input(input);
+                    match input {
+                        PlayInput::PAUSEPLAY => {
+                            if sink.is_paused() {
+                                sink.play();
+                            } else {
+                                sink.pause();
+                            }
+                        }
+                        PlayInput::NEXT => {
+                            sink.skip_one();
+                        }
+                        PlayInput::HELP => {}
+                        PlayInput::SETVOLUME(v) => {
+                            sink.set_volume(v);
+                        }
+                        PlayInput::QUIT => {
+                            break;
+                        }
+                        PlayInput::INVALID(err) => {
+                            interface.error(err.as_str());
                         }
                     }
-                    Input::NEXT => {
-                        sink.skip_one();
-                    }
-                    Input::HELP => {}
-                    Input::SETVOLUME(v) => {
-                        sink.set_volume(v);
-                    }
-                    Input::QUIT => {
-                        break;
-                    }
-                    Input::STATUS => {
-                        self.print_status_terminal(&mut stdout, &status);
-                    }
-                    Input::INVALID => {
-                        stdout.execute(crossterm::cursor::MoveTo(0, 1));
-                        stdout.execute(crossterm::terminal::Clear(
-                            crossterm::terminal::ClearType::CurrentLine,
-                        ));
-                        print!("Invalid Input");
-                        stdout.execute(crossterm::cursor::MoveTo(0, 2));
-                        stdout.execute(crossterm::terminal::Clear(
-                            crossterm::terminal::ClearType::CurrentLine,
-                        ));
-                    }
-                },
+                }
                 _ => {}
             }
         }
-        drop(thread);
-    }
-    fn reset_terminal(&self, stdout: &mut std::io::Stdout) {
-        todo!()
-    }
-    fn print_status_terminal(&self, s: &mut std::io::Stdout, status: &Status) {
-        todo!()
     }
 }

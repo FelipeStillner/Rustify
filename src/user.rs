@@ -16,12 +16,4 @@ impl User {
             musics: vec![],
         }
     }
-    pub fn add_playlist(&mut self, p: Playlist) {
-        self.playlists.push(p);
-    }
-    pub fn get_playlist(&mut self, n: &str) -> Option<&Playlist> {
-        self.playlists
-            .iter()
-            .find(|&x| x.name.as_str() == n)
-    }
 }

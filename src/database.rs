@@ -1,5 +1,3 @@
-use sqlite::Connection;
-
 use crate::*;
 
 pub struct Database {
@@ -85,36 +83,8 @@ impl Database {
             p.add_music(self.find_music_id(music_id).unwrap())
         }
     }
-    pub fn add_music(&self, music: Music) -> Result<(), (sqlite::Error)> {
-        let query = format!("INSERT INTO musics (name, filename, duration) VALUES (\"{}\", \"{}\", {});", music.name, music.filename, music.duration).to_string();
-        self.connection.execute(query)
-    }
-    pub fn add_playlist(&self, playlist: Playlist) -> Result<(), (sqlite::Error)> {
-        let mut query = format!("INSERT INTO playlists (name, user_id) VALUES (\"{}\", {});", playlist.name, playlist.user_id).to_string();
-        
-        for music in playlist.musics {
-            query.push_str(format!("INSERT INTO music_playlist (music, playlist) VALUES ({}, {});", music.id, playlist.id).as_str());
-        }
-        self.connection.execute(query)
-    }
     pub fn add_user(&self, user: User) -> Result<(), (sqlite::Error)> {
         let query = format!("INSERT INTO users (name) VALUES (\"{}\");", user.name).to_string();
         self.connection.execute(query)
-    }
-    pub fn add_music_playlist(&self, music_id: i64, playlist_id: i64) -> Result<(), (sqlite::Error)> {
-        let query = format!("INSERT INTO music_playlist (music_id, playlist_id) VALUES ({}, {});", music_id, playlist_id).to_string();
-        self.connection.execute(query)
-    }
-    pub fn remove_music(&self, music_name: &str, user_id: i64) -> Result<(), (sqlite::Error)> {
-        todo!()
-    }
-    pub fn remove_playlist(&self, playlist_name: &str, user_id: i64) -> Result<(), (sqlite::Error)> {
-        todo!()
-    }
-    pub fn remove_user(&self, user_name: &str, user_id: i64) -> Result<(), (sqlite::Error)> {
-        todo!()
-    }
-    pub fn remove_music_playlist(&self, music_name: &str, playlist_name: &str, user_id: i64) -> Result<(), (sqlite::Error)> {
-        todo!()
     }
 }

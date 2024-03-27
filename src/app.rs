@@ -1,10 +1,10 @@
 use crate::*;
-use std::io::{self, BufRead, Read};
 
 pub struct App {
-    state: AppState,
+    pub state: AppState,
     database: Database,
-    user: User,
+    pub user: User,
+    last_state: AppState,
 }
 
 impl App {
@@ -12,181 +12,126 @@ impl App {
         App {
             state: AppState::LOGIN,
             database: Database::new(),
-            user: User::new(0, "GUEST"),
+            user: User::new(0, "guest"),
+            last_state: AppState::QUIT,
         }
     }
     pub fn run(&mut self) {
+        let (terminal, receiver) = Terminal::new();
+        let thread = thread::spawn(move || terminal.get_input());
+
+        let mut interface = Interface::new();
+        interface.state = "login".to_string();
+
         loop {
+            interface.update();
             match &self.state {
-                AppState::LOGIN => {
-                    println!(">> LogIn - input:");
-                    let mut input = String::new();
-                    io::stdin().read_line(&mut input).unwrap();
-                    let input_list: Vec<&str> = input.trim().split(" ").collect();
-                    if input_list[0].to_uppercase() == "QUIT" {
-                        self.state = AppState::QUIT;
-                    } else if input_list[0].to_uppercase() == "GUEST" {
-                        self.state = AppState::HOME
-                    } else if input_list[0].to_uppercase() == "NEW" {
-                        let user: User = User::new(0, input_list[1].to_uppercase().as_str());
-                        match self.database.add_user(user) {
-                            Ok(_) => {}
-                            Err(_) => {
-                                println!("# Error: Invalid New User ");
-                            }
-                        }
-                    } else {
-                        match self
-                            .database
-                            .find_user(input_list[0].to_uppercase().as_str())
-                        {
-                            Some(user) => {
-                                self.user = user;
-                                self.state = AppState::HOME;
-                            }
-                            None => {
-                                println!("# Error: Invalid User");
-                            }
-                        }
-                    }
-                }
                 AppState::PLAYMUSIC(music) => {
-                    println!("a");
-                    music.play();
+                    interface.clear();
+                    music.play(&receiver, &mut interface);
                     self.state = AppState::HOME;
+                    interface.state = "home".to_string();
+                    interface.clear();
                 }
                 AppState::PLAYPLAYLIST(playlist) => {
-                    playlist.play();
+                    interface.clear();
+                    playlist.play(&receiver, &mut interface);
                     self.state = AppState::HOME;
-                }
-                AppState::HOME => {
-                    self.run_home();
+                    interface.state = "home".to_string();
+                    interface.clear();
                 }
                 AppState::QUIT => {
-                    println!(">> QUIT");
                     break;
                 }
-                AppState::EDIT => {
-                    todo!()
-                }
+                _ => {}
             }
-        }
-    }
-    fn run_home(&mut self) {
-        println!(">> Home ({}) - input:", self.user.name);
-        let mut input = String::new();
-        io::stdin().lock().read_line(&mut input).unwrap();
-        let input_list: Vec<&str> = input.trim().split(" ").collect();
-        if input_list[0] == "quit" {
-            self.state = AppState::QUIT;
-        } else if input_list[0] == "pm" {
-            // pm <music_name> : play music_name
-            if input_list.len() == 1 {
-                println!("# Error: Include the music name");
-            } else {
-                match self.database.find_music(input_list[1]) {
-                    None => {
-                        println!("# Error: Invalid music name!");
-                    }
-                    Some(music) => {
-                        self.state = AppState::PLAYMUSIC(music);
-                    }
-                };
-            }
-        } else if input_list[0] == "pp" {
-            // pp <playlist_name> : play playlist_name
-            if input_list.len() == 1 {
-                println!("# Error: Include the playlist name");
-            } else {
-                match self.database.find_playlist(input_list[1], self.user.id) {
-                    None => {
-                        println!("# Error: Invalid playlist name!");
-                    }
-                    Some(playlist) => {
-                        self.state = AppState::PLAYPLAYLIST(playlist);
-                    }
-                };
-            }
-        } else if input_list[0] == "am" {
-            // am <music_name> <music_path> : add music to database
-            if input_list.len() <= 2 {
-                println!("# Error: Include the music name and path");
-            } else {
-                let music = Music::new(0, input_list[1].trim(), input_list[2].trim(), 0);
-                match std::fs::File::open(format!("musics/{}", input_list[2].to_string())) {
-                    Ok(_) => {
-                        println!("{}", music.filename);
-                        match self.database.add_music(music) {
-                            Ok(_) => {}
-                            Err(_) => {
-                                println!("# Error: name or path invalid");
+            interface.update();
+
+            if let Ok(input) = receiver.try_recv() {
+                interface.clear();
+                match &self.state {
+                    AppState::LOGIN => {
+                        let input = manipulate_login_input(input);
+                        match input {
+                            LoginInput::GUEST => {
+                                self.state = AppState::HOME;
+                                interface.state = "home".to_string();
+                                interface.user_name = "guest".to_string();
+                            }
+                            LoginInput::QUIT => {
+                                self.state = AppState::QUIT;
+                                interface.state = "quit".to_string();
+                            }
+                            LoginInput::NEW(user) => {
+                                let user: User = User::new(0, &user);
+                                match self.database.add_user(user) {
+                                    Ok(_) => {}
+                                    Err(_) => {
+                                        interface.error("# Error: Invalid New User ");
+                                    }
+                                }
+                            }
+                            LoginInput::OTHER(user_name) => {
+                                match self.database.find_user(user_name.as_str()) {
+                                    Some(user) => {
+                                        self.user = user;
+                                        self.state = AppState::HOME;
+                                        interface.state = "home".to_string();
+                                        interface.user_name = user_name;
+                                    }
+                                    None => {
+                                        interface.error("# Error: Invalid User");
+                                    }
+                                }
                             }
                         }
                     }
-                    Err(_) => {
-                        println!("# Error: Invalid path");
+                    AppState::HOME => {
+                        println!(">> Home ({}) - input:", self.user.name);
+                        let input = manipulate_home_input(input);
+                        match input {
+                            HomeInput::QUIT => {
+                                self.state = AppState::QUIT;
+                                interface.state = "quit".to_string();
+                            }
+                            HomeInput::PLAYPLAYLIST(playlist) => {
+                                match self.database.find_playlist(playlist.as_str(), self.user.id) {
+                                    Some(p) => {
+                                        self.state = AppState::PLAYPLAYLIST(p);
+                                        interface.state = "play_playlist".to_string();
+                                        interface.playlist = playlist;
+                                    }
+                                    None => {
+                                        interface.error("# Error: Invalid playlist name!");
+                                    }
+                                };
+                            }
+                            HomeInput::PLAYMUSIC(music) => {
+                                match self.database.find_music(music.as_str()) {
+                                    Some(m) => {
+                                        self.state = AppState::PLAYMUSIC(m);
+                                        interface.state = "play_music".to_string();
+                                        interface.playlist = music;
+                                    }
+                                    None => {
+                                        interface.error("# Error: Invalid music name!");
+                                    }
+                                };
+                            }
+                            HomeInput::INVALID => {
+                                interface.error("# Error: Invalid input!");
+                            }
+                        }
                     }
-                };
-            }
-        } else if input_list[0] == "ap" {
-            // ap <playlist_name> : add playlist to database
-            if input_list.len() == 1 {
-                println!("# Error: Include the playlist name");
-            } else {
-                let playlist = Playlist::new(0, input_list[1].trim(), self.user.id);
-                match self.database.add_playlist(playlist) {
-                    Ok(_) => {}
-                    Err(_) => {
-                        println!("# Error: name invalid");
+                    AppState::EDIT => {
+                        todo!()
                     }
+                    _ => {}
                 }
-            }
-        } else if input_list[0] == "amp" {
-            // amp <music_name> <playlist_name> : add music to the playlist
-            if input_list.len() <= 2 {
-                println!("# Error: Include the playlist name");
+                interface.write_line("", 4);
             } else {
-                match self
-                    .database
-                    .find_playlist(input_list[2].trim(), self.user.id)
-                {
-                    None => {
-                        println!("# Error: Invalid playlist name");
-                    }
-                    Some(playlist) => match self.database.find_music(input_list[1].trim()) {
-                        None => {
-                            println!("# Error: Invalid music name");
-                        }
-                        Some(music) => {
-                            self.database.add_music_playlist(music.id, playlist.id);
-                        }
-                    },
-                }
+                //todo
             }
-        } else if input_list[0] == "rp" {
-            // rp <playlist_name> : remove playlist
-            if input_list.len() == 1 {
-                println!("# Error: Include the playlist name");
-            } else {
-                match self
-                    .database
-                    .find_playlist(input_list[2].trim(), self.user.id)
-                {
-                    None => {
-                        println!("# Error: Invalid playlist name");
-                    }
-                    Some(playlist) => match self.database.find_music(input_list[1].trim()) {
-                        None => {
-                            println!("# Error: Invalid music name");
-                        }
-                        Some(music) => {
-                            self.database.add_music_playlist(music.id, playlist.id);
-                        }
-                    },
-                }
-            }
-        } else {
-            println!("# Error: Invalid Input");
         }
     }
 }

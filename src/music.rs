@@ -1,11 +1,3 @@
-use crossterm::terminal::Clear;
-use crossterm::{ExecutableCommand, QueueableCommand};
-use rodio::Sink;
-use std::io::{BufReader, Stdout, Write};
-use std::sync::mpsc::{self, Receiver, Sender};
-use std::thread::{self, current, sleep, Thread};
-use std::time::{Duration, Instant, SystemTime};
-
 use crate::*;
 
 #[derive(Debug, Clone)]
@@ -28,19 +20,16 @@ impl Music {
 }
 
 impl Play for Music {
-    fn play(&self) {
-        let mut stdout = std::io::stdout();
-        self.reset_terminal(&mut stdout);
-
-        let (sender, receiver): (Sender<Input>, Receiver<Input>) = mpsc::channel();
-        let thread = thread::spawn(|| <Music as Play>::get_input(sender));
-
+    fn play(&self, receiver: &std::sync::mpsc::Receiver<String>, interface: &mut Interface) {
         let (_stream, handle) = rodio::OutputStream::try_default().unwrap();
         let sink = rodio::Sink::try_new(&handle).unwrap();
         let path = String::from("musics/") + self.filename.as_str();
         let file = std::fs::File::open(path.to_string()).unwrap();
         sink.append(rodio::Decoder::new(BufReader::new(file)).unwrap());
         sink.play();
+
+        interface.music = self.name.to_string();
+        interface.music_duration = self.duration;
 
         let mut status = Status::new();
 
@@ -49,83 +38,41 @@ impl Play for Music {
             let dt: Duration = instant.elapsed();
             instant = Instant::now();
             status.update(dt, sink.is_paused());
+
+            interface.update();
+            interface.music_time = status.time;
+            interface.paused = status.paused;
+
             match receiver.try_recv() {
-                Ok(i) => {
-                    match i {
-                        Input::PAUSEPLAY => {
+                Ok(input) => {
+                    interface.clear();
+                    let input = manipulate_play_input(input);
+                    match input {
+                        PlayInput::PAUSEPLAY => {
                             if sink.is_paused() {
                                 sink.play();
                             } else {
                                 sink.pause();
                             }
                         }
-                        Input::NEXT => {
+                        PlayInput::NEXT => {
                             break;
                         }
-                        Input::HELP => {}
-                        Input::SETVOLUME(v) => {
+                        PlayInput::HELP => {}
+                        PlayInput::SETVOLUME(v) => {
                             sink.set_volume(v);
                         }
-                        Input::QUIT => {
+                        PlayInput::QUIT => {
                             break;
                         }
-                        Input::STATUS => {
-                            self.print_status_terminal(&mut stdout, &status);
-                        }
-                        Input::INVALID => {
-                            stdout.execute(crossterm::cursor::MoveTo(0, 1));
-                            stdout.execute(crossterm::terminal::Clear(
-                                crossterm::terminal::ClearType::CurrentLine,
-                            ));
-                            print!("Invalid Input");
-                            stdout.execute(crossterm::cursor::MoveTo(0, 2));
-                            stdout.execute(crossterm::terminal::Clear(
-                                crossterm::terminal::ClearType::CurrentLine,
-                            ));
+                        PlayInput::INVALID(err) => {
+                            interface.error(err.as_str());
                         }
                     }
-                    stdout.execute(crossterm::cursor::MoveTo(0, 2));
-                    stdout.execute(crossterm::terminal::Clear(
-                        crossterm::terminal::ClearType::CurrentLine,
-                    ));
                 }
                 _ => {}
             }
         }
-        drop(thread);
         sink.clear();
-    }
-    fn reset_terminal(&self, stdout: &mut std::io::Stdout) {
-        stdout.execute(crossterm::terminal::SetSize(50, 5));
-        stdout.execute(crossterm::terminal::Clear(
-            crossterm::terminal::ClearType::All,
-        ));
-
-        let title = format!("Playing Music: {}", self.name);
-        stdout.execute(crossterm::terminal::SetTitle(title));
-
-        stdout.execute(crossterm::cursor::MoveTo(0, 0));
-        let static_line = format!("Music: {}, Duration: {}", self.name, self.duration);
-        print!("{}", static_line);
-
-        self.print_status_terminal(stdout, &Status::new());
-    }
-    fn print_status_terminal(&self, stdout: &mut std::io::Stdout, status: &Status) {
-        stdout.execute(crossterm::cursor::MoveTo(0, 1));
-        stdout.execute(crossterm::terminal::Clear(
-            crossterm::terminal::ClearType::CurrentLine,
-        ));
-        let status_line = format!(
-            "time: {}:{}, pause: {}",
-            status.time.as_secs() / 60,
-            status.time.as_secs() % 60,
-            status.paused
-        );
-        print!("{}", status_line);
-
-        stdout.execute(crossterm::cursor::MoveTo(0, 2));
-        stdout.execute(crossterm::terminal::Clear(
-            crossterm::terminal::ClearType::CurrentLine,
-        ));
     }
 }
