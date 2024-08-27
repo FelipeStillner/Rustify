@@ -12,17 +12,16 @@ Libraries:
 
 ToDo:
 
-* edit, add - musics, playlists and users
-  * remove mu(mus)
+* edit, add, remove - musics, playlists and users
 * Import and export musics
 * Change the thread from only when playing to everywhere, To solve the problem of input thread doesnt stop
 * Add author for each music
   * Also add info about him
 * Insert musician interface
 * insert more info about each music
-  * Author
-  * Producer
-  * Genre
+  1. Author
+  1. Producer
+  1. Genre
 * Add Album
 * Add podcasts
 * Improve the privacy for:

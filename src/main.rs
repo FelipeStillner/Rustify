@@ -20,6 +20,7 @@ mod playlist;
 mod status;
 mod terminal;
 mod user;
+mod artist;
 
 use app::*;
 use app_state::*;
@@ -32,6 +33,7 @@ use playlist::*;
 use status::*;
 use terminal::*;
 use user::*;
+use artist::*;
 
 fn main() {
     App::new().run();
